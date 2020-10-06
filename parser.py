@@ -12,7 +12,6 @@ import openpyxl
 
 
 # input data for scrapping ads
-
 ad_name = input('Введите что нужно найти: ')
 region = input('Введите регион*: ').lower()
 category = input('Введите категорию*: ').lower()
@@ -27,7 +26,7 @@ except transliterate.exceptions.LanguageDetectionError:
     subcategory_for_url = ''
 # CONSTANTS
 HOST: str = 'https://www.avito.ru'
-URL: str = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory}?{ad_name_for_url}'
+URL: str = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
 USER_AGENTS: List['user_agent'] = [user_agent.strip() for user_agent in open('user-agents.txt').readlines()]
 MONTH_IN_NUMBER = {
     'января': '01',
@@ -48,6 +47,8 @@ url_type = NewType('url_type', str)
 int_price = NewType('int_price', int)
 # To read the first fifty ads
 counter_first_fifty_ads: int = 50
+
+start_time_script = time.time()
 output_xlsx_file: dict = {
     'Ключ': ad_name,
     'Регион': region,
@@ -64,6 +65,12 @@ output_xlsx_file: dict = {
 
 
 def set_common_amount_of_ad(bs_html: BeautifulSoup) -> None:
+    """
+    Set common amount of ad and check if there is an exception
+     were they banned by IP or no ads were found for these parameters.
+
+    bs_html: BeautifulSoup -> object from BeautifulSoup from page with ads.
+    """
     amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
     try:
         output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string)
@@ -76,6 +83,11 @@ def set_common_amount_of_ad(bs_html: BeautifulSoup) -> None:
 
 
 def set_total_amount_views(views_on_ad_page: list) -> None:
+    """
+    Set total amount views on today and in generally first 50 ads and all.
+
+    views_on_ad_page: list -> list consist of views all time and today. ['{views all time}', '(+{views today})']
+    """
     global counter_first_fifty_ads
 
     if counter_first_fifty_ads != 0:
@@ -89,6 +101,11 @@ def set_total_amount_views(views_on_ad_page: list) -> None:
 
 
 def add_price_to_price_from_all_ads(price_of_product: int_price) -> None:
+    """
+    Adds the price to the price from all ads.
+
+    price_of_product: int_price -> price specified in the ad.
+    """
     output_xlsx_file['Средняя цена всех со всех объявлений'] += price_of_product
 
 
@@ -134,12 +151,23 @@ def set_date_of_publication_of_ad() -> None:
 
 
 def set_average_price_of_all_ads() -> None:
+    """Sets and calculates the arithmetic average of prices from all ads."""
     output_xlsx_file['Средняя цена всех со всех объявлений'] = \
         (output_xlsx_file['Средняя цена всех со всех объявлений']
          / output_xlsx_file['Общее количество объявлений'])
 
 
-def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) -> int_price:
+def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) -> None:
+    """
+    Bypasses the traps that Avito makes. For example, it can send that
+     the page was not found, although it exists. If the price of the ad
+     does not indicate the product price is 0. If Avito sends an error 429,
+     the script stops working because it can no longer send requests due to IP blocking.
+
+    bs_ad_html: BeautifulSoup -> object from BeautifulSoup from ad page.
+    ad_page: Response -> response from ad page Avito.
+    link: str -> link on ad page.
+    """
     try:
 
         views_on_ad_page: str = bs_ad_html.find(class_='title-info-metadata-item').get_text()[1:].split()
@@ -194,9 +222,20 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) 
 
 
 def send_ad_data_to_functions(max_pages: int) -> None:
+    """
+    Send data to functions, received from ad page. In this function implementation
+     simulation of the human factor (makes random pauses before the request
+     (about 6-9 seconds) and requests a random number of times (from 1 to 5)).
+     This is done so that Avito does not consider the parser a bot. Also protects
+     against advertisements from another city that spoil statistics. He function
+     goes through the pages (if the number of ads allows), opens the ads and sends
+     the desired data to the functions. If Avito give sponsored links, function skip this.
 
+     max_pages: int -> maximum number of pages with ads.
+    """
     maximum_amount_of_open_links_without_pause: int = randint(1, 5)
     next_page: int = 1
+    counter_parsed_link = 0
     # Sometimes ads are not enough for one page and Avito fills it with similar ads.
     if output_xlsx_file['Общее количество объявлений'] <= 50:
         ad_limit = output_xlsx_file['Общее количество объявлений']
@@ -234,15 +273,23 @@ def send_ad_data_to_functions(max_pages: int) -> None:
             bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
 
             bypass_traps_avito(bs_ad_content, ad_page, link)
-            print(c(f'{link[12:]: ^} спарсено удачно.').magenta)
+            counter_parsed_link += 1
+            print(c(f'{link[12:]: <115} спарсено удачно.').magenta,
+                  c(f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}').white)
+        if isinstance(ad_limit, int): break
         print(f'{next_page} из {max_pages} спарсено.')
         next_page += 1
-        if isinstance(ad_limit, int): break
     set_average_price_of_all_ads()
     print(c('Парсинг завершен успешно!').green)
 
 
 def input_data_in_xlsx_file() -> None:
+    """
+    Input parsed data in xlsx file. If this file is not exist, create new xlsx file
+     with named columns and named sheet. Fill every columns by values specified in
+     the output_xlsx_file dictionary. If a line is full, it skips that line and checks
+     if the next line is already occupied. If not busy, fills in data.
+     """
     row: int = 2
     xlsx_file_name: str = 'avito_statistic.xlsx'
     try:
@@ -287,6 +334,7 @@ def run():
     print('Записываем данные...')
     input_data_in_xlsx_file()
     print(c('Данные успешно записаны!').green)
+    print('Время работы парсера', round(time.time() - start_time_script), 'секунды')
 
 
 if __name__ == '__main__':
