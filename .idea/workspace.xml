@@ -11,8 +11,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5fd3375a-0922-4148-be36-490393cf1e46" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/parser_nocolor.py" beforeDir="false" afterPath="$PROJECT_DIR$/parser_nocolor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,10 +29,10 @@
   </component>
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/text.py" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
-  <component name="RunManager" selected="Python.parser">
+  <component name="RunManager" selected="Python.text">
     <configuration default="true" type="PythonConfigurationType" factoryName="Python">
       <module name="avito_parser" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -75,7 +75,8 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="test" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+    <configuration name="text" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="avito_parser" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <envs>
@@ -86,8 +87,7 @@
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/../test.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/text.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -98,7 +98,7 @@
     </configuration>
     <list>
       <item itemvalue="Python.parser" />
-      <item itemvalue="Python.test" />
+      <item itemvalue="Python.text" />
     </list>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
@@ -125,10 +125,10 @@
     <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="418" y="197" width="1084" height="733" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1602081945881">
+    <state x="418" y="197" width="1084" height="757" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1602092953197">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state x="418" y="197" width="1084" height="733" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602081945881" />
+    <state x="418" y="197" width="1084" height="757" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092953197" />
     <state x="688" y="343" width="533" height="388" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1601917196937">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
@@ -141,29 +141,29 @@
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
     <state x="763" y="432" width="493" height="210" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1601929721918" />
-    <state x="743" y="297" width="424" height="479" key="FileChooserDialogImpl" timestamp="1602092590767">
+    <state x="743" y="297" width="424" height="479" key="FileChooserDialogImpl" timestamp="1602092946696">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state x="743" y="297" width="424" height="479" key="FileChooserDialogImpl/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092590767" />
-    <state width="1898" height="96" key="GridCell.Tab.0.bottom" timestamp="1602092459111">
+    <state x="743" y="297" width="424" height="479" key="FileChooserDialogImpl/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092946696" />
+    <state width="1898" height="372" key="GridCell.Tab.0.bottom" timestamp="1602093080204">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state width="1898" height="96" key="GridCell.Tab.0.bottom/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092459111" />
+    <state width="1898" height="372" key="GridCell.Tab.0.bottom/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602093080204" />
     <state width="1898" height="697" key="GridCell.Tab.0.bottom/0.0.1920.1080/1920.0.1920.1200@1920.0.1920.1200" timestamp="1602086248789" />
-    <state width="1898" height="96" key="GridCell.Tab.0.center" timestamp="1602092459110">
+    <state width="1898" height="372" key="GridCell.Tab.0.center" timestamp="1602093080204">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state width="1898" height="96" key="GridCell.Tab.0.center/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092459110" />
+    <state width="1898" height="372" key="GridCell.Tab.0.center/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602093080204" />
     <state width="1898" height="697" key="GridCell.Tab.0.center/0.0.1920.1080/1920.0.1920.1200@1920.0.1920.1200" timestamp="1602086248788" />
-    <state width="1898" height="96" key="GridCell.Tab.0.left" timestamp="1602092459110">
+    <state width="1898" height="372" key="GridCell.Tab.0.left" timestamp="1602093080204">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state width="1898" height="96" key="GridCell.Tab.0.left/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092459110" />
+    <state width="1898" height="372" key="GridCell.Tab.0.left/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602093080204" />
     <state width="1898" height="697" key="GridCell.Tab.0.left/0.0.1920.1080/1920.0.1920.1200@1920.0.1920.1200" timestamp="1602086248788" />
-    <state width="1898" height="96" key="GridCell.Tab.0.right" timestamp="1602092459111">
+    <state width="1898" height="372" key="GridCell.Tab.0.right" timestamp="1602093080204">
       <screen x="0" y="0" width="1920" height="1080" />
     </state>
-    <state width="1898" height="96" key="GridCell.Tab.0.right/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602092459111" />
+    <state width="1898" height="372" key="GridCell.Tab.0.right/0.0.1920.1080/1920.0.1920.1200@0.0.1920.1080" timestamp="1602093080204" />
     <state width="1898" height="697" key="GridCell.Tab.0.right/0.0.1920.1080/1920.0.1920.1200@1920.0.1920.1200" timestamp="1602086248789" />
     <state width="1898" height="356" key="GridCell.Tab.1.bottom" timestamp="1601931724039">
       <screen x="0" y="0" width="1920" height="1080" />
