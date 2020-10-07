@@ -8,7 +8,6 @@ from requests import Response
 from bs4 import BeautifulSoup
 from typing import List, NewType
 from random import choice, random, randint
-from termcolor2 import c
 from urllib import parse
 from sys import exit
 import datetime
@@ -76,9 +75,9 @@ def set_common_amount_of_ad(bs_html: BeautifulSoup) -> None:
         output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string)
     except AttributeError:
         if bs_html.find('h2', class_='firewall-title') is None:
-            print(c('По вашим параметрам ничего не найдено.').red)
+            print('По вашим параметрам ничего не найдено.')
         else:
-            print(c('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.').red)
+            print('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.')
         exit()
 
 
@@ -266,12 +265,12 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
                 except AttributeError:
                     price_of_product: int_price = 0
             except AttributeError:
-                print(c('''
+                print('''
                       Это исключение возможно лишь при том, если Avito отвечает не тем сайтом, который пар-
                       сер ожидал увидеть. За остальной информацией обращайтесь к файлу help.txt.
 
                       Если программа продолжает парсить, необращайте внимания.
-                      ''').yellow)
+                      ''')
             else:
                 try:
                     set_total_amount_views(views_on_ad_page)
@@ -282,11 +281,11 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
 
         elif ad_page.status_code == 429:
 
-            print(c('''
+            print('''
                   Ваш IP был заблокирован на время. Нужно подождать некоторое время, либо зайти на
                   на сайт через браузер и ввести капчу. Если ничто из этого не помогло, следуйте указа-
                   ниям в файле help.txt.
-                  ''').red)
+                  ''')
             exit()
 
     else:
@@ -364,7 +363,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
             bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
 
             bypass_traps_avito(bs_ad_content, ad_page, link)
-            print(c(f'{link[12:]: <115} спарсено удачно.').magenta,
+            print(f'{link[12:]: <115} спарсено удачно.',
                   f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
             counter_parsed_link += 1
             if counter_parsed_link == int(output_xlsx_file["Общее количество объявлений"]):
@@ -373,7 +372,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
         print(f'{next_page} из {max_pages} спарсено.')
         next_page += 1
     set_average_price_of_all_ads()
-    print(c('Парсинг завершен успешно!').green)
+    print('Парсинг завершен успешно!')
 
 
 def write_first_list(workbook_list) -> None:
@@ -551,7 +550,7 @@ def run():
 
             print('Записываем данные...')
             send_workbook_lists()
-            print(c('Данные успешно записаны!').green)
+            print('Данные успешно записаны!')
         else:
             break
 
@@ -560,3 +559,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+
