@@ -1,3 +1,8 @@
+"""
+Это парсер данных с авито. Он проходится по каждому объявлению и собирает нужные
+данные. Во время парсинга авито может указывать количество объявлений указанные
+по параметрам с рекламой, так что иногда счётчик может показывать неправильное количество"""
+
 import requests
 from requests import Response
 from bs4 import BeautifulSoup
@@ -6,27 +11,15 @@ from random import choice, random, randint
 from termcolor2 import c
 from urllib import parse
 from sys import exit
+import datetime
 import time
 import transliterate
 import openpyxl
 
 
-# input data for scrapping ads
-ad_name = input('Введите что нужно найти: ')
-region = input('Введите регион*: ').lower()
-category = input('Введите категорию*: ').lower()
-subcategory = input('Введите подкатегорию: ')
-
-ad_name_for_url = parse.urlencode({'q': ad_name})
-region_for_url = transliterate.translit(region, reversed=True).replace(' ', '_')
-category_for_url = transliterate.translit(category, reversed=True).replace(' ', '_')
-try:
-    subcategory_for_url = transliterate.translit(subcategory, reversed=True).replace(' ', '_')
-except transliterate.exceptions.LanguageDetectionError:
-    subcategory_for_url = ''
 # CONSTANTS
 HOST: str = 'https://www.avito.ru'
-URL: str = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
+URL: str = ''
 USER_AGENTS: List['user_agent'] = [user_agent.strip() for user_agent in open('user-agents.txt').readlines()]
 MONTH_IN_NUMBER = {
     'января': '01',
@@ -48,20 +41,27 @@ int_price = NewType('int_price', int)
 # To read the first fifty ads
 counter_first_fifty_ads: int = 50
 
+ad_name = ''
+region = ''
+category = ''
+subcategory = ''
+list_statistic_about_ad: List[dict] = []
 start_time_script = time.time()
-output_xlsx_file: dict = {
-    'Ключ': ad_name,
-    'Регион': region,
-    'Общее количество объявлений': 0,
-    'Общее количество просмотров всего': 0,
-    'Общее количество просмотров за сегодня': 0,
-    'Дата публикации 10-ого объявления (сортировка по дате)': 'Нету',
-    '20-ого объявления (сортировка по дате)': 'Нету',
-    '50-ого объявления (сортировка по дате)': 'Нету',
-    'Средняя цена всех со всех объявлений': 0,
-    'Общее количество просмотров первых 50 объявлений (сегодня)': 0,
-    'Общее количество просмотров первых 50 объявлений (всего)': 0
-}
+output_xlsx_file: dict = {}
+names_columns_in_statistic_by_ad = [
+    'Позиция (сортировка по умолчанию)',
+    'Название объявления',
+    'Описание',
+    'Адрес',
+    'Цена(в рублях)',
+    'Имя продовца',
+    'Количество объявлений у продовца',
+    'Количество просмотров всего',
+    'Количество просмотров за сегодня',
+    'Ссылка на объявление',
+    'Дата публикации',
+    'Время публикации'
+]
 
 
 def set_common_amount_of_ad(bs_html: BeautifulSoup) -> None:
@@ -110,7 +110,7 @@ def add_price_to_price_from_all_ads(price_of_product: int_price) -> None:
 
 
 def set_date_of_publication_of_ad() -> None:
-
+    """Sets the date of publication of the ad at 10, 20 and 50 places."""
     list_of_ad_publication_dates = []
     max_number_of_attempts = 10
 
@@ -157,7 +157,80 @@ def set_average_price_of_all_ads() -> None:
          / output_xlsx_file['Общее количество объявлений'])
 
 
-def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) -> None:
+def date_handler(date_publication: str) -> str:
+    """Handled received date from ad. Return data in format day.month.year."""
+    datetime_today = datetime.date.today()
+    datetime_for_format = datetime.date(datetime_today.year, datetime_today.month, datetime_today.day)
+    if date_publication.lower() == 'сегодня':
+        date_publication = datetime_for_format.strftime('%d.%m.%Y')
+    elif date_publication.lower() == 'вчера':
+        date_publication = str(datetime_today.day - 1) + datetime_for_format.strftime('.%m.%Y')
+    else:
+        day_publication, month_publication = date_publication.split()
+        month_publication = MONTH_IN_NUMBER[month_publication]
+        date_publication = f'{day_publication}.{month_publication}.2020'
+    return date_publication
+
+
+def set_data_about_ad(ad_page: Response, views_on_ad: list, price_of_product: int_price, link: url_type) -> None:
+    """Fill dictionary need data and add filled dictionary in list."""
+    bs_ad_page: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
+
+    try:
+        total_views: int = int(views_on_ad[0])
+        views_today: int = int(views_on_ad[1][2:-1])
+    except IndexError:
+        total_views = 0
+        views_today = 0
+
+    statistic_about_ad = {
+        'Название объявления': '',
+        'Описание': '',
+        'Адрес': '',
+        'Цена': price_of_product,
+        'Имя продовца': '',
+        'Количество объявлений у продовца': 0,
+        'Количество просмотров всего': total_views,
+        'Количество просмотров за сегодня': views_today,
+        'Ссылка на объявление': link,
+        'Дата публикации': '',
+        'Время публикации': ''
+    }
+
+    ad_name: str = bs_ad_page.find('span', class_='title-info-title-text').string.strip()
+
+    try:
+        ad_description: str = bs_ad_page.find('div', class_='item-description').get_text().strip()
+    except AttributeError:
+        open('index.html', 'w').write(ad_page.text)
+        ad_description: str = 'Нету'
+
+    try:
+        seller_address: str = bs_ad_page.find('div', class_='item-address').get_text().strip()
+    except AttributeError:
+        seller_address: str = 'Нету'
+
+    try:
+        number_active_ads = bs_ad_page.find('div', class_='subscription-buttons-row-eLD9M').get_text().strip()[:1]
+    except AttributeError:
+        number_active_ads = 'Нету'
+    date_and_time_publication = bs_ad_page.find('div', class_='title-info-metadata-item-redesign').string.strip()
+
+    seller_name: str = bs_ad_page.find('div', class_='seller-info-name').get_text()
+    publication_date = date_handler(date_and_time_publication[:-5].strip().replace(' в', ''))
+    publication_time = date_and_time_publication[-5:]  # 16:24
+
+    statistic_about_ad['Название объявления'] = ad_name
+    statistic_about_ad['Описание'] = ad_description
+    statistic_about_ad['Адрес'] = seller_address
+    statistic_about_ad['Имя продовца'] = seller_name
+    statistic_about_ad['Количество объявлений у продовца'] = number_active_ads
+    statistic_about_ad['Дата публикации'] = publication_date
+    statistic_about_ad['Время публикации'] = publication_time
+    list_statistic_about_ad.append(statistic_about_ad)
+
+
+def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_type) -> None:
     """
     Bypasses the traps that Avito makes. For example, it can send that
      the page was not found, although it exists. If the price of the ad
@@ -176,7 +249,6 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) 
                 str(bs_ad_html.find('span', class_='js-item-price').text).replace(' ', ''))
         except AttributeError:
             price_of_product: int_price = 0
-
     except AttributeError:
 
         if ad_page.status_code == 404:
@@ -202,6 +274,7 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) 
                 except IndexError:
                     pass
                 add_price_to_price_from_all_ads(price_of_product)
+                set_data_about_ad(ad_page, views_on_ad_page, price_of_product, link)
 
         elif ad_page.status_code == 429:
 
@@ -219,6 +292,7 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: str) 
         except IndexError:
             pass
         add_price_to_price_from_all_ads(price_of_product)
+        set_data_about_ad(ad_page, views_on_ad_page, price_of_product, link)
 
 
 def send_ad_data_to_functions(max_pages: int) -> None:
@@ -235,7 +309,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
     """
     maximum_amount_of_open_links_without_pause: int = randint(1, 5)
     next_page: int = 1
-    counter_parsed_link = 0
+    counter_parsed_link = 1
     # Sometimes ads are not enough for one page and Avito fills it with similar ads.
     if output_xlsx_file['Общее количество объявлений'] <= 50:
         ad_limit = output_xlsx_file['Общее количество объявлений']
@@ -248,6 +322,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
         content_of_ad_page: BeautifulSoup = BeautifulSoup(page_with_ad.content, 'html.parser')
         links_on_ads: List[url_type] = [HOST + element.get('href') for element in
                                         content_of_ad_page.find_all('a', class_='snippet-link')]
+
         while not links_on_ads:
             # Avito sometimes gives out the wrong data that it usually gives out (we are talking about classes).
             links_on_ads = [HOST + element.get('href') for element in
@@ -273,9 +348,11 @@ def send_ad_data_to_functions(max_pages: int) -> None:
             bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
 
             bypass_traps_avito(bs_ad_content, ad_page, link)
-            counter_parsed_link += 1
             print(c(f'{link[12:]: <115} спарсено удачно.').magenta,
-                  c(f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}').white)
+                  f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
+            counter_parsed_link += 1
+            if counter_parsed_link == int(output_xlsx_file["Общее количество объявлений"]):
+                break
         if isinstance(ad_limit, int): break
         print(f'{next_page} из {max_pages} спарсено.')
         next_page += 1
@@ -283,57 +360,185 @@ def send_ad_data_to_functions(max_pages: int) -> None:
     print(c('Парсинг завершен успешно!').green)
 
 
-def input_data_in_xlsx_file() -> None:
-    """
-    Input parsed data in xlsx file. If this file is not exist, create new xlsx file
-     with named columns and named sheet. Fill every columns by values specified in
-     the output_xlsx_file dictionary. If a line is full, it skips that line and checks
-     if the next line is already occupied. If not busy, fills in data.
-     """
+def write_first_list(workbook_list) -> None:
+    """Writes in first leaf (Общая статистика) received data in the process of parsing."""
     row: int = 2
-    xlsx_file_name: str = 'avito_statistic.xlsx'
-    try:
-        workbook = openpyxl.load_workbook(xlsx_file_name)
-    except FileNotFoundError:
-        new_workbook = openpyxl.Workbook()
-        for sheet_name in new_workbook.sheetnames:
-            sheet = new_workbook[sheet_name]
-            new_workbook.remove(sheet)
-        new_workbook_list = new_workbook.create_sheet('avito_statistic')
-        for column in range(1, 11 + 1):
+    column_letters = 'ABCDEFGHIJK'
+    row_is_free: bool = False
 
-            new_workbook_list.cell(row=1, column=column).value = list(output_xlsx_file.keys())[column - 1]
-        new_workbook.save(xlsx_file_name)
-        new_workbook.close()
-        workbook = openpyxl.load_workbook(xlsx_file_name)
-
-    workbook_list = workbook['avito_statistic']
     while True:
-        if workbook_list['C' + str(row)].value is None:
+
+        for col_letter in column_letters:
+            if workbook_list[col_letter + str(row)].value is None:
+                row_is_free = True
+            else:
+                row_is_free = False
+                break
+
+        if row_is_free:
             for column in range(1, 11 + 1):
                 workbook_list.cell(row=row, column=column).value = list(output_xlsx_file.values())[column - 1]
             break
         else:
             row += 1
+
+
+def write_second_list(workbook_list) -> None:
+    """Writes in second leaf (Статистика по объявлениям) received data in the process of parsing."""
+    row: int = 2
+    column_letters = 'ABCDEFGHIJKL'
+    row_is_free: bool = False
+
+    while True:
+
+        for col_letter in column_letters:
+            if workbook_list[col_letter + str(row)].value is None:
+                row_is_free = True
+            else:
+                row_is_free = False
+                break
+        if row_is_free:
+            for statistic_ad in list_statistic_about_ad:
+                try:
+                    workbook_list.cell(row=row, column=1).value = str(int(workbook_list['A' + str(row - 1)].value) + 1)
+                except ValueError:
+                    workbook_list.cell(row=row, column=1).value = '1'
+                for column in range(2, len(names_columns_in_statistic_by_ad) + 1):
+                    workbook_list.cell(row=row, column=column).value = list(statistic_ad.values())[column - 2]
+                row += 1
+            break
+        else:
+            row += 1
+
+
+def send_workbook_lists() -> None:
+    """
+    Send functions workbook list in which need write data. If the excel file
+    table does not exist, it creates a new one with the required parameters and sheets.
+    """
+    xlsx_file_name: str = 'avito_statistic.xlsx'
+
+    try:
+        workbook = openpyxl.load_workbook(xlsx_file_name)
+    except FileNotFoundError:
+        new_workbook = openpyxl.Workbook()
+
+        for sheet_name in new_workbook.sheetnames:
+            sheet = new_workbook[sheet_name]
+            new_workbook.remove(sheet)
+
+        new_workbook_list_1 = new_workbook.create_sheet('Общая статистика')
+
+        for column in range(1, 11 + 1):
+            new_workbook_list_1.cell(row=1, column=column).value = list(output_xlsx_file.keys())[column - 1]
+
+        new_workbook_list_2 = new_workbook.create_sheet('Статистика по объявлениям')
+
+        for column in range(1, len(names_columns_in_statistic_by_ad) + 1):
+            new_workbook_list_2.cell(row=1, column=column).value = names_columns_in_statistic_by_ad[column - 1]
+
+        new_workbook.save(xlsx_file_name)
+        new_workbook.close()
+        workbook = openpyxl.load_workbook(xlsx_file_name)
+
+    workbook_list_1 = workbook['Общая статистика']
+    workbook_list_2 = workbook['Статистика по объявлениям']
+
+    write_first_list(workbook_list_1)
+    write_second_list(workbook_list_2)
+
     workbook.save(xlsx_file_name)
     workbook.close()
 
 
 def run():
-    avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)})
-    avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
+    global ad_name, region, category, subcategory, list_statistic_about_ad, counter_first_fifty_ads,\
+        output_xlsx_file, URL
 
-    set_common_amount_of_ad(avito_page_content)
-    time.sleep(3)
+    row: int = 2
+    column_letters = 'ABCD'
+    row_is_fill: bool = False
 
-    set_date_of_publication_of_ad()
-    time.sleep(5)
+    xlsx_file_path = input('Введите название файла с параметрами или его путь: ')
+    workbook = openpyxl.load_workbook(xlsx_file_path)
+    workbook_list = workbook['Лист1']
 
-    max_pages = int(avito_page_content.find_all('span', class_='pagination-item-1WyVp')[-2].text)
-    send_ad_data_to_functions(max_pages)
-    print('Записываем данные...')
-    input_data_in_xlsx_file()
-    print(c('Данные успешно записаны!').green)
+    while True:
+
+        for col_letter in column_letters:
+            if workbook_list[col_letter + str(row)].value is None:
+                row_is_fill = False
+            else:
+                row_is_fill = True
+                break
+
+        if row_is_fill:
+            # Pause before parsing
+            print('Подождите 10-20 секунд...')
+            time.sleep(round(randint(10, 20) + random(), 2))
+
+            # Parameters for link which need parsed
+            ad_name = workbook_list[f'A{row}'].value.lower()
+            region = workbook_list[f'B{row}'].value.lower().strip()
+            category = workbook_list[f'C{row}'].value.lower().strip()
+            subcategory = workbook_list[f'D{row}'].value.lower().strip()
+
+            if ',' in region:
+                region = region.split(',')[0]
+            ad_name_for_url = parse.urlencode({'q': ad_name})
+            region_for_url = transliterate.translit(
+                region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+            category_for_url = transliterate.translit(
+                category, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+            try:
+                subcategory_for_url = transliterate.translit(
+                    subcategory, reversed=True).strip().replace(' ', '_').replace("'", '').replace('j', 'y')
+            except transliterate.exceptions.LanguageDetectionError:
+                subcategory_for_url = ''
+
+            URL = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
+            print(URL)
+            row += 1
+
+            # Reset past data
+            list_statistic_about_ad = []
+            counter_first_fifty_ads = 50
+            output_xlsx_file = {
+                'Ключ': ad_name,
+                'Регион': region,
+                'Общее количество объявлений': 0,
+                'Общее количество просмотров всего': 0,
+                'Общее количество просмотров за сегодня': 0,
+                'Дата публикации 10-ого объявления (сортировка по дате)': 'Нету',
+                '20-ого объявления (сортировка по дате)': 'Нету',
+                '50-ого объявления (сортировка по дате)': 'Нету',
+                'Средняя цена всех со всех объявлений': 0,
+                'Общее количество просмотров первых 50 объявлений (сегодня)': 0,
+                'Общее количество просмотров первых 50 объявлений (всего)': 0
+            }
+
+            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)})
+            avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
+
+            set_common_amount_of_ad(avito_page_content)
+            time.sleep(3)
+
+            set_date_of_publication_of_ad()
+            time.sleep(5)
+
+            try:
+                max_pages = int(avito_page_content.find_all('span', class_='pagination-item-1WyVp')[-2].text)
+            except IndexError:
+                max_pages = 1
+
+            send_ad_data_to_functions(max_pages)
+
+            print('Записываем данные...')
+            send_workbook_lists()
+            print(c('Данные успешно записаны!').green)
+        else:
+            break
+
     print('Время работы парсера', round(time.time() - start_time_script), 'секунды')
 
 
