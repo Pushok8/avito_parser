@@ -256,9 +256,9 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
                 try:
                     ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
                 except requests.exceptions.ConnectionError:
-                    print()
+                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
                 except requests.exceptions.Timeout:
-                    print()
+                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
                 bs_ad_html: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
                 views_on_ad_page: list = bs_ad_html.find(class_='title-info-metadata-item').get_text()[1:].split()
                 try:
@@ -321,15 +321,8 @@ def send_ad_data_to_functions(max_pages: int) -> None:
         ad_limit = 'More than 50'
 
     while next_page != max_pages + 1:
-        try:
-            page_with_ad: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)},
-                                                  params={'p': next_page}, timeout=120)
-        except requests.exceptions.ConnectionError:
-            print()
-            continue
-        except requests.exceptions.Timeout:
-            print()
-            continue
+        page_with_ad: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)},
+                                              params={'p': next_page}, timeout=120)
         content_of_ad_page: BeautifulSoup = BeautifulSoup(page_with_ad.content, 'html.parser')
         links_on_ads: List[url_type] = [HOST + element.get('href') for element in
                                         content_of_ad_page.find_all('a', class_='snippet-link')]
@@ -355,7 +348,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
                 maximum_amount_of_open_links_without_pause = randint(1, 4)
             maximum_amount_of_open_links_without_pause -= 1
             try:
-                ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=60)
+                ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
             except requests.exceptions.ConnectionError:
                 print()
                 continue
