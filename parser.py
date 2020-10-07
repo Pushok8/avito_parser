@@ -254,7 +254,7 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
         if ad_page.status_code == 404:
             try:
                 try:
-                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)})
+                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
                 except requests.exceptions.ConnectionError:
                     print()
                 except requests.exceptions.Timeout:
@@ -322,7 +322,8 @@ def send_ad_data_to_functions(max_pages: int) -> None:
 
     while next_page != max_pages + 1:
         try:
-            page_with_ad: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, params={'p': next_page})
+            page_with_ad: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)},
+                                                  params={'p': next_page}, timeout=120)
         except requests.exceptions.ConnectionError:
             print()
             continue
@@ -533,7 +534,7 @@ def run():
                 'Общее количество просмотров первых 50 объявлений (всего)': 0
             }
 
-            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)})
+            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
             avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
 
             set_common_amount_of_ad(avito_page_content)
