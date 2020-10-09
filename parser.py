@@ -75,6 +75,8 @@ def get_response(url: url_type, params: dict = {}):
                                               timeout=60, params=params)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             print('Повторяем попытку...')
+        except requests.exceptions.MissingSchema:
+            print('Ссылка невалидна.')
         else:
             return response
     else:
@@ -100,7 +102,10 @@ def set_common_amount_of_ad() -> None:
             return True
             break
         except AttributeError:
-            if bs_html.find('h2', class_='firewall-title') is None:
+            if bs_html.find('h2', class_='no-results-title-3kn6E') is not None:
+                print('Ничего не найдено в выбранной области поиска')
+                return False
+            elif bs_html.find('h2', class_='firewall-title') is None:
 
                 if try_number == 1:
                     print(f'Введите регион ({region}), что бы он отвечал на вопрос (область чья?) '
@@ -124,7 +129,7 @@ def set_common_amount_of_ad() -> None:
                 else:
                     print(c('По вашим параметрам ничего не найдено.').red)
                     return False
-            else:
+            elif bs_html.find('h2', class_='firewall-title') is not None:
                 print(c('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.').red)
                 exit()
 
