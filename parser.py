@@ -258,7 +258,7 @@ def set_data_about_ad(ad_page: Response, views_on_ad: list, price_of_product: in
     try:
         button_with_number_active_ads = bs_ad_page.find(class_='seller-info-favorite-seller-buttons').get('data-props')
         number_active_ads = int(json.loads(button_with_number_active_ads)['summary'].split()[0])
-    except AttributeError:
+    except (AttributeError, IndexError):
         number_active_ads = 0
 
     ad_title: str = bs_ad_page.find('span', class_='title-info-title-text').string.strip()
@@ -401,10 +401,6 @@ def send_ad_data_to_functions(max_pages: int) -> None:
 
         for link in links_on_ads:
             if link not in parsed_ads:
-                if isinstance(ad_limit, int):
-                    ad_limit -= 1
-                if ad_limit == 0: break
-
                 # It is done to imitate a person, so that Avito does not consider the parser a bot.
                 # If delete this code, Avito can give block by IP for a while.
                 if maximum_amount_of_open_links_without_pause == 0:
@@ -420,6 +416,10 @@ def send_ad_data_to_functions(max_pages: int) -> None:
                 print(c(f'{link[12:]: <115} спарсено удачно.').magenta,
                       f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
                 counter_parsed_link += 1
+                if isinstance(ad_limit, int):
+                    ad_limit -= 1
+                if ad_limit == 0:
+                    break
 
         if isinstance(ad_limit, int): break
         print(f'{next_page} из {max_pages} спарсено.')

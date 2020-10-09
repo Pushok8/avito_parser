@@ -49,7 +49,6 @@ subcategory = ''
 list_statistic_about_ad: List[dict] = []
 start_time_script = time.time()
 output_xlsx_file: dict = {}
-parsed_ads: List[url_type] = []
 names_columns_in_statistic_by_ad = [
     'Позиция (сортировка по умолчанию)',
     'Название объявления',
@@ -75,6 +74,7 @@ def get_response(url: url_type, params: dict = {}):
                                               timeout=60, params=params)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             print('Повторяем попытку...')
+            time.sleep(2.2)
         else:
             return response
     else:
@@ -361,24 +361,19 @@ def send_ad_data_to_functions(max_pages: int) -> None:
 
     while next_page != max_pages + 1:
 
-        link_on_page_with_ads: url_type = get_response(URL).url
-
         # Avito does not allow you to navigate through the pages if a link with random letters is not specified
         # (this is how it looks like avito.ru/chita/krasota_i_zdorove/kupit-meditsinskie_izdeliya-ASgBAgICAUSEAqgJ),
         # this link can be obtained by request. This is the only way to go through the pages
-        if '?' in link_on_page_with_ads:
-            link_to_navigate_through_pages: url_type = link_on_page_with_ads + f'&p={next_page}'
-        else:
-            link_to_navigate_through_pages: url_type = link_on_page_with_ads + f'?p={next_page}'
+        link_on_page_with_ads: url_type = get_response(URL).url
         time.sleep(2.2)
-
-        page_with_ad: Response = get_response(link_to_navigate_through_pages)
+        page_with_ad: Response = get_response(link_on_page_with_ads, {'p': next_page})
         content_of_ad_page: BeautifulSoup = BeautifulSoup(page_with_ad.content, 'html.parser')
         links_on_ads: List[url_type] = []
 
         for element in content_of_ad_page.find_all(class_='item_table-description'):
             link_on_ad = HOST + element.find('a').get('href')
             if link_on_ad[21:].find('/') == -1:
+                print(element.find('a').get('href'))
                 continue
             else:
                 links_on_ads.append(link_on_ad)
@@ -388,6 +383,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
             for element in content_of_ad_page.find_all(class_='iva-item-body-NPl6W'):
                 link_on_ad = HOST + element.find('a').get('href')
                 if link_on_ad[21:].find('/') == -1:
+                    print(element.find('a').get('href'))
                     continue
                 else:
                     links_on_ads.append(link_on_ad)
@@ -400,26 +396,25 @@ def send_ad_data_to_functions(max_pages: int) -> None:
         time.sleep(3)
 
         for link in links_on_ads:
-            if link not in parsed_ads:
-                if isinstance(ad_limit, int):
-                    ad_limit -= 1
-                if ad_limit == 0: break
 
-                # It is done to imitate a person, so that Avito does not consider the parser a bot.
-                # If delete this code, Avito can give block by IP for a while.
-                if maximum_amount_of_open_links_without_pause == 0:
-                    time.sleep(round(randint(8, 10) + random(), 2))
-                    maximum_amount_of_open_links_without_pause = randint(1, 5)
-                maximum_amount_of_open_links_without_pause -= 1
+            if isinstance(ad_limit, int):
+                ad_limit -= 1
+            if ad_limit == 0: break
 
-                ad_page: Response = get_response(link)
-                bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
-                bypass_traps_avito(bs_ad_content, ad_page, link)
-                parsed_ads.append(link)
+            # It is done to imitate a person, so that Avito does not consider the parser a bot.
+            # If delete this code, Avito can give block by IP for a while.
+            if maximum_amount_of_open_links_without_pause == 0:
+                time.sleep(round(randint(8, 10) + random(), 2))
+                maximum_amount_of_open_links_without_pause = randint(1, 5)
+            maximum_amount_of_open_links_without_pause -= 1
 
-                print(f'{link[12:]: <115} спарсено удачно.',
-                      f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
-                counter_parsed_link += 1
+            ad_page: Response = get_response(link)
+            bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
+            bypass_traps_avito(bs_ad_content, ad_page, link)
+
+            print(f'{link[12:]: <115} спарсено удачно.',
+                  f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
+            counter_parsed_link += 1
 
         if isinstance(ad_limit, int): break
         print(f'{next_page} из {max_pages} спарсено.')
@@ -523,7 +518,7 @@ def send_workbook_lists() -> None:
 
 def run():
     global ad_name, region, category, subcategory, list_statistic_about_ad, counter_first_fifty_ads, \
-        output_xlsx_file, parsed_ads, URL
+        output_xlsx_file, URL
 
     row: int = 2
     column_letters = 'ABCD'
@@ -577,7 +572,6 @@ def run():
             # Reset past data
             list_statistic_about_ad = []
             counter_first_fifty_ads = 50
-            parsed_ads = []
             output_xlsx_file = {
                 'Ключ': ad_name,
                 'Регион': region,
