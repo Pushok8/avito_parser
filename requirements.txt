@@ -18,6 +18,7 @@ jdcal==1.4.1
 Jinja2==2.11.2
 kaitaistruct==0.8
 ldap3==2.7
+lxml==4.5.2
 MarkupSafe==1.1.1
 numpy==1.19.2
 openpyxl==3.0.5

@@ -8,8 +8,10 @@ from requests import Response
 from bs4 import BeautifulSoup
 from typing import List, NewType
 from random import choice, random, randint
+from termcolor2 import c
 from urllib import parse
 from sys import exit
+import json
 import datetime
 import time
 import transliterate
@@ -64,22 +66,67 @@ names_columns_in_statistic_by_ad = [
 ]
 
 
-def set_common_amount_of_ad(bs_html: BeautifulSoup) -> None:
+def get_response(url: url_type, params: dict = {}):
+    """Tries to get an answer by url from Avito 10 times. If it failed, it returns False"""
+    number_of_request_try: int = 10
+    for try_ in range(number_of_request_try):
+        try:
+            response: Response = requests.get(url, headers={'User-Agent': choice(USER_AGENTS)},
+                                              timeout=60, params=params)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            print('Повторяем попытку...')
+        else:
+            return response
+    else:
+        return False
+
+
+def set_common_amount_of_ad() -> None:
     """
     Set common amount of ad and check if there is an exception
      were they banned by IP or no ads were found for these parameters.
 
-    bs_html: BeautifulSoup -> object from BeautifulSoup from page with ads.
+    return: bool -> if page have ads True, if not have - False.
     """
-    amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
-    try:
-        output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string)
-    except AttributeError:
-        if bs_html.find('h2', class_='firewall-title') is None:
-            print('По вашим параметрам ничего не найдено.')
-        else:
-            print('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.')
-        exit()
+    global region, URL
+
+    past_region = region
+    for try_number in range(1, 4):
+        try:
+            page_with_ads = get_response(URL)
+            bs_html: BeautifulSoup = BeautifulSoup(page_with_ads.content, 'html.parser')
+            amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
+            output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string)
+            return True
+            break
+        except AttributeError:
+            if bs_html.find('h2', class_='firewall-title') is None:
+
+                if try_number == 1:
+                    print(f'Введите регион ({region}), что бы он отвечал на вопрос (область чья?) '
+                          'или образовывал словосочитание по типу (Московская область).\n'
+                          'Примеры:\n'
+                          ' Киров -> Кировская\n'
+                          ' Москва -> Московская\n')
+                    region = input('Вводите: ').strip() + ' область ' + region
+                    region_for_url = transliterate.translit(
+                        region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+
+                    URL = URL[:URL[8:].find('/') + 9] + region_for_url + URL[21 + URL[21:].find('/'):]
+
+                elif try_number == 2:
+
+                    print('Введите ссылку вручную. Её можно получить на Авито '
+                          'https://www.avito.ru/ в адресной строке, указав в поисковик параметры:\n'
+                          f'Ключ: {ad_name} Регион: {past_region} Категория: {category} Подкатегория: {subcategory}\n')
+                    URL = input('Вводите: ')
+
+                else:
+                    print('По вашим параметрам ничего не найдено.')
+                    return False
+            else:
+                print('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.')
+                exit()
 
 
 def set_total_amount_views(views_on_ad_page: list) -> None:
@@ -117,14 +164,16 @@ def set_date_of_publication_of_ad() -> None:
     while not list_of_ad_publication_dates:
         time.sleep(3)
 
-        ads_sorted_by_date = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, params={'s': 104})
+        ads_sorted_by_date = get_response(URL, {'s': 104})
         bs_page_ads = BeautifulSoup(ads_sorted_by_date.content, 'html.parser')
         ads_publication_dates = bs_page_ads.find_all('div', class_='snippet-date-info')
 
         if max_number_of_attempts == 0:
             print('Повторите попытку.')
             exit()
+
         max_number_of_attempts -= 1
+
         for date_tag in ads_publication_dates[:output_xlsx_file['Общее количество объявлений']]:
             try:
                 day_publication, month_publication = date_tag['data-tooltip'].split()[:2]
@@ -161,6 +210,7 @@ def date_handler(date_publication: str) -> str:
     """Handled received date from ad. Return data in format day.month.year."""
     datetime_today = datetime.date.today()
     datetime_for_format = datetime.date(datetime_today.year, datetime_today.month, datetime_today.day)
+
     if date_publication.lower() == 'сегодня':
         date_publication = datetime_for_format.strftime('%d.%m.%Y')
     elif date_publication.lower() == 'вчера':
@@ -197,36 +247,34 @@ def set_data_about_ad(ad_page: Response, views_on_ad: list, price_of_product: in
         'Время публикации': ''
     }
 
-    ad_name: str = bs_ad_page.find('span', class_='title-info-title-text').string.strip()
-
     try:
         ad_description: str = bs_ad_page.find('div', class_='item-description').get_text().strip()
     except AttributeError:
-        open('index.html', 'w').write(ad_page.text)
         ad_description: str = 'Нету'
-
     try:
         seller_address: str = bs_ad_page.find('div', class_='item-address').get_text().strip()
     except AttributeError:
         seller_address: str = 'Нету'
-
     try:
-        number_active_ads = bs_ad_page.find('div', class_='subscription-buttons-row-eLD9M').get_text().strip()[:1]
+        button_with_number_active_ads = bs_ad_page.find(class_='seller-info-favorite-seller-buttons').get('data-props')
+        number_active_ads = int(json.loads(button_with_number_active_ads)['summary'].split()[0])
     except AttributeError:
-        number_active_ads = 'Нету'
-    date_and_time_publication = bs_ad_page.find('div', class_='title-info-metadata-item-redesign').string.strip()
+        number_active_ads = 0
 
+    ad_title: str = bs_ad_page.find('span', class_='title-info-title-text').string.strip()
+    date_and_time_publication = bs_ad_page.find('div', class_='title-info-metadata-item-redesign').string.strip()
     seller_name: str = bs_ad_page.find('div', class_='seller-info-name').get_text()
     publication_date = date_handler(date_and_time_publication[:-5].strip().replace(' в', ''))
     publication_time = date_and_time_publication[-5:]  # 16:24
 
-    statistic_about_ad['Название объявления'] = ad_name
+    statistic_about_ad['Название объявления'] = ad_title
     statistic_about_ad['Описание'] = ad_description
     statistic_about_ad['Адрес'] = seller_address
     statistic_about_ad['Имя продовца'] = seller_name
     statistic_about_ad['Количество объявлений у продовца'] = number_active_ads
     statistic_about_ad['Дата публикации'] = publication_date
     statistic_about_ad['Время публикации'] = publication_time
+
     list_statistic_about_ad.append(statistic_about_ad)
 
 
@@ -242,7 +290,6 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
     link: str -> link on ad page.
     """
     try:
-
         views_on_ad_page: str = bs_ad_html.find(class_='title-info-metadata-item').get_text()[1:].split()
         try:
             price_of_product: int_price = int(
@@ -250,15 +297,9 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
         except AttributeError:
             price_of_product: int_price = 0
     except AttributeError:
-
         if ad_page.status_code == 404:
             try:
-                try:
-                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
-                except requests.exceptions.ConnectionError:
-                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
-                except requests.exceptions.Timeout:
-                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
+                ad_page: Response = get_response(link)
                 bs_ad_html: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
                 views_on_ad_page: list = bs_ad_html.find(class_='title-info-metadata-item').get_text()[1:].split()
                 try:
@@ -280,18 +321,14 @@ def bypass_traps_avito(bs_ad_html: BeautifulSoup, ad_page: Response, link: url_t
                     pass
                 add_price_to_price_from_all_ads(price_of_product)
                 set_data_about_ad(ad_page, views_on_ad_page, price_of_product, link)
-
         elif ad_page.status_code == 429:
-
             print('''
                   Ваш IP был заблокирован на время. Нужно подождать некоторое время, либо зайти на
                   на сайт через браузер и ввести капчу. Если ничто из этого не помогло, следуйте указа-
                   ниям в файле help.txt.
                   ''')
             exit()
-
     else:
-
         try:
             set_total_amount_views(views_on_ad_page)
         except IndexError:
@@ -304,7 +341,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
     """
     Send data to functions, received from ad page. In this function implementation
      simulation of the human factor (makes random pauses before the request
-     (about 6-9 seconds) and requests a random number of times (from 1 to 5)).
+     (about 8-10 seconds) and requests a random number of times (from 1 to 5)).
      This is done so that Avito does not consider the parser a bot. Also protects
      against advertisements from another city that spoil statistics. He function
      goes through the pages (if the number of ads allows), opens the ads and sends
@@ -314,7 +351,8 @@ def send_ad_data_to_functions(max_pages: int) -> None:
     """
     maximum_amount_of_open_links_without_pause: int = randint(1, 5)
     next_page: int = 1
-    counter_parsed_link = 1
+    counter_parsed_link: int = 1
+
     # Sometimes ads are not enough for one page and Avito fills it with similar ads.
     if output_xlsx_file['Общее количество объявлений'] <= 50:
         ad_limit = output_xlsx_file['Общее количество объявлений']
@@ -323,8 +361,7 @@ def send_ad_data_to_functions(max_pages: int) -> None:
 
     while next_page != max_pages + 1:
 
-        link_on_page_with_ads: url_type = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)},
-                                                       timeout=120).url
+        link_on_page_with_ads: url_type = get_response(URL).url
 
         # Avito does not allow you to navigate through the pages if a link with random letters is not specified
         # (this is how it looks like avito.ru/chita/krasota_i_zdorove/kupit-meditsinskie_izdeliya-ASgBAgICAUSEAqgJ),
@@ -334,25 +371,32 @@ def send_ad_data_to_functions(max_pages: int) -> None:
         else:
             link_to_navigate_through_pages: url_type = link_on_page_with_ads + f'?p={next_page}'
         time.sleep(2.2)
-        page_with_ad: Response = requests.get(link_to_navigate_through_pages,
-                                              headers={'User-Agent': choice(USER_AGENTS)},
-                                              timeout=120)
+
+        page_with_ad: Response = get_response(link_to_navigate_through_pages)
         content_of_ad_page: BeautifulSoup = BeautifulSoup(page_with_ad.content, 'html.parser')
         links_on_ads: List[url_type] = []
-        for element in content_of_ad_page.find_all('a', class_='snippet-link'):
-            link_on_ad = HOST + element.get('href')
-            if link_on_ad[21:link_on_ad[21:].find('/') + 21] != URL[21:URL[21:].find('/') + 21]:
+
+        for element in content_of_ad_page.find_all(class_='item_table-description'):
+            link_on_ad = HOST + element.find('a').get('href')
+            if link_on_ad[21:].find('/') == -1:
                 continue
             else:
                 links_on_ads.append(link_on_ad)
-        while not links_on_ads:
+
+        if not links_on_ads:
             # Avito sometimes gives out the wrong data that it usually gives out (we are talking about classes).
-            for element in content_of_ad_page.find_all('a', class_='title-root-395AQ'):
-                link_on_ad = HOST + element.get('href')
-                if link_on_ad[21:link_on_ad[21:].find('/') + 21] != URL[21:URL[21:].find('/') + 21]:
+            for element in content_of_ad_page.find_all(class_='iva-item-body-NPl6W'):
+                link_on_ad = HOST + element.find('a').get('href')
+                if link_on_ad[21:].find('/') == -1:
                     continue
                 else:
                     links_on_ads.append(link_on_ad)
+        if not links_on_ads:
+            open('new_tags_неудалять.html', 'w').write(page_with_ad.text)
+            print('Авито прислал невалидный сайт, перезапустите программу с теми параметрами, '
+                  'на которых остановился парсер.')
+            exit()
+
         time.sleep(3)
 
         for link in links_on_ads:
@@ -364,34 +408,28 @@ def send_ad_data_to_functions(max_pages: int) -> None:
                 # It is done to imitate a person, so that Avito does not consider the parser a bot.
                 # If delete this code, Avito can give block by IP for a while.
                 if maximum_amount_of_open_links_without_pause == 0:
-                    time.sleep(round(randint(7, 10) + random(), 2))
-                    maximum_amount_of_open_links_without_pause = randint(1, 4)
+                    time.sleep(round(randint(8, 10) + random(), 2))
+                    maximum_amount_of_open_links_without_pause = randint(1, 5)
                 maximum_amount_of_open_links_without_pause -= 1
 
-                try:
-                    ad_page: Response = requests.get(link, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
-                except requests.exceptions.ConnectionError:
-                    print()
-                    continue
-                except requests.exceptions.Timeout:
-                    print()
-                    continue
+                ad_page: Response = get_response(link)
                 bs_ad_content: BeautifulSoup = BeautifulSoup(ad_page.content, 'html.parser')
-
                 bypass_traps_avito(bs_ad_content, ad_page, link)
                 parsed_ads.append(link)
+
                 print(f'{link[12:]: <115} спарсено удачно.',
                       f'Осталось {counter_parsed_link}/{output_xlsx_file["Общее количество объявлений"]}')
-
                 counter_parsed_link += 1
 
         if isinstance(ad_limit, int): break
         print(f'{next_page} из {max_pages} спарсено.')
         next_page += 1
+
     set_average_price_of_all_ads()
     print('Парсинг завершен успешно!')
 
 
+# Write to xlsx
 def write_first_list(workbook_list) -> None:
     """Writes in first leaf (Общая статистика) received data in the process of parsing."""
     row: int = 2
@@ -506,15 +544,16 @@ def run():
 
         if row_is_fill:
             # Pause before parsing
-            print('Подождите 40-60 секунд...')
+            print('Подождите 40-65 секунд...')
             time.sleep(round(randint(40, 65) + random(), 2))
 
             # Parameters for link which need parsed
-            ad_name = workbook_list[f'A{row}'].value.lower()
+            ad_name = workbook_list[f'A{row}'].value
             region = workbook_list[f'B{row}'].value.lower().strip()
             category = workbook_list[f'C{row}'].value.lower().strip()
             subcategory = workbook_list[f'D{row}'].value.lower().strip()
 
+            # Formatted to construct a link
             if ',' in region:
                 region = region.split(',')[0]
             ad_name_for_url = parse.urlencode({'q': ad_name})
@@ -529,8 +568,10 @@ def run():
                 subcategory_for_url = ''
 
             URL = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
-            print(f'Парсится ссылка {URL},\n'
-                  f'где ключ называется "{ad_name}", категория это "{category}", а подкатегория "{subcategory}"')
+            print(f'Парсится ссылка {URL}')
+            print(f'{"Ключ": ^25} | {"Регион": ^26} | {"Категория": ^29} | {"Подкатегория": ^32}')
+            print('_' * 121)
+            print(f'{ad_name: ^23} | {region: ^26} | {category: ^28} | {subcategory: ^32}')
             row += 1
 
             # Reset past data
@@ -551,15 +592,13 @@ def run():
                 'Общее количество просмотров первых 50 объявлений (всего)': 0
             }
 
-            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
-            avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
-
-            set_common_amount_of_ad(avito_page_content)
+            if not set_common_amount_of_ad():
+                continue
+            set_date_of_publication_of_ad()
             time.sleep(3)
 
-            set_date_of_publication_of_ad()
-            time.sleep(5)
-
+            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
+            avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
             try:
                 max_pages = int(avito_page_content.find_all('span', class_='pagination-item-1WyVp')[-2].text)
             except IndexError:
@@ -578,4 +617,3 @@ def run():
 
 if __name__ == '__main__':
     run()
-
