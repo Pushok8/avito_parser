@@ -463,7 +463,8 @@ def write_second_list(workbook_list) -> None:
     row: int = 2
     column_letters = 'ABCDEFGHIJKL'
     row_is_free: bool = False
-
+    counter_rows: int = 0
+    
     while True:
 
         for col_letter in column_letters:
@@ -474,10 +475,8 @@ def write_second_list(workbook_list) -> None:
                 break
         if row_is_free:
             for statistic_ad in list_statistic_about_ad:
-                try:
-                    workbook_list.cell(row=row, column=1).value = str(int(workbook_list['A' + str(row - 1)].value) + 1)
-                except ValueError:
-                    workbook_list.cell(row=row, column=1).value = '1'
+                counter_rows += 1
+                workbook_list.cell(row=row, column=1).value = counter_rows
                 for column in range(2, len(names_columns_in_statistic_by_ad) + 1):
                     workbook_list.cell(row=row, column=column).value = list(statistic_ad.values())[column - 2]
                 row += 1
