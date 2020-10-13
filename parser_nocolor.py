@@ -3,17 +3,18 @@
 данные. Во время парсинга авито может указывать количество объявлений указанные
 по параметрам с рекламой, так что иногда счётчик может показывать неправильное количество
 """
-import requests
-from requests import Response
-from bs4 import BeautifulSoup
-from typing import List, NewType
-from random import choice, random, randint
-from termcolor2 import c
 from urllib import parse
 from sys import exit
+from typing import List, NewType
+from random import choice, random, randint
 import json
 import datetime
 import time
+
+import requests
+from requests import Response
+from bs4 import BeautifulSoup
+from termcolor2 import c
 import transliterate
 import openpyxl
 
@@ -90,24 +91,33 @@ def set_common_amount_of_ad() -> None:
 
     return: bool -> if page have ads True, if not have - False.
     """
-    global region, URL
+    global ad_name, region, category, subcategory, URL
 
     past_region = region
-    for try_number in range(1, 4):
+    for try_number in range(1, 5):
         try:
             page_with_ads = get_response(URL)
             bs_html: BeautifulSoup = BeautifulSoup(page_with_ads.content, 'html.parser')
             amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
             output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string.replace(' ', ''))
+
+            print(f'Парсится ссылка {URL}')
+            print(f'{"Ключ": ^25} | {"Регион": ^26} | {"Категория": ^29} | {"Подкатегория": ^32}')
+            print('_' * 121)
+            print(f'{ad_name: ^23} | {region: ^26} | {category: ^28} | {subcategory: ^32}')
+
             return True
-            break
         except AttributeError:
             if bs_html.find('h2', class_='no-results-title-3kn6E') is not None:
                 print('Ничего не найдено в выбранной области поиска')
                 return False
             elif bs_html.find('h2', class_='firewall-title') is None:
-
                 if try_number == 1:
+                    region = region.split()[-1].strip()
+                    region_for_url = transliterate.translit(
+                        region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+                    URL = URL[:URL[8:].find('/') + 9] + region_for_url + URL[21 + URL[21:].find('/'):]
+                elif try_number == 2:
                     print(f'Введите регион ({region}), что бы он отвечал на вопрос (область чья?) '
                           'или образовывал словосочитание по типу (Московская область).\n'
                           'Примеры:\n'
@@ -119,12 +129,13 @@ def set_common_amount_of_ad() -> None:
 
                     URL = URL[:URL[8:].find('/') + 9] + region_for_url + URL[21 + URL[21:].find('/'):]
 
-                elif try_number == 2:
+                elif try_number == 3:
 
                     print('Введите ссылку вручную. Её можно получить на Авито '
                           'https://www.avito.ru/ в адресной строке, указав в поисковик параметры:\n'
-                          f'Ключ: {ad_name} Регион: {past_region} Категория: {category} Подкатегория: {subcategory}\n')
+                          f'Ключ: {ad_name}; Регион: {past_region}; Категория: {category}; Подкатегория: {subcategory};\n')
                     URL = input('Вводите: ')
+                    region = transliterate.translit(URL[21:URL.find('/', 21)], 'ru')
 
                 else:
                     print('По вашим параметрам ничего не найдено.')
@@ -574,10 +585,6 @@ def run():
                 subcategory_for_url = ''
 
             URL = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
-            print(f'Парсится ссылка {URL}')
-            print(f'{"Ключ": ^25} | {"Регион": ^26} | {"Категория": ^29} | {"Подкатегория": ^32}')
-            print('_' * 121)
-            print(f'{ad_name: ^23} | {region: ^26} | {category: ^28} | {subcategory: ^32}')
             row += 1
 
             # Reset past data
