@@ -98,7 +98,7 @@ def set_common_amount_of_ad() -> None:
             page_with_ads = get_response(URL)
             bs_html: BeautifulSoup = BeautifulSoup(page_with_ads.content, 'html.parser')
             amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
-            output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string)
+            output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string.replace(' ', ''))
             return True
             break
         except AttributeError:
@@ -549,7 +549,7 @@ def run():
         if row_is_fill:
             # Pause before parsing
             print('Подождите 40-65 секунд...')
-            time.sleep(round(randint(40, 65) + random(), 2))
+            # time.sleep(round(randint(40, 65) + random(), 2))
 
             # Parameters for link which need parsed
             ad_name = workbook_list[f'A{row}'].value
@@ -558,8 +558,10 @@ def run():
             subcategory = workbook_list[f'D{row}'].value.lower().strip()
 
             # Formatted to construct a link
-            if ',' in region:
-                region = region.split(',')[0]
+            if region.count(',') == 1:
+                region = region.replace(',', '')
+            elif region.count(',') > 1:
+                region = region.split(',')[-1].strip()
             ad_name_for_url = parse.urlencode({'q': ad_name})
             region_for_url = transliterate.translit(
                 region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
