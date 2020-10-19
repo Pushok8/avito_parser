@@ -642,6 +642,11 @@ def run():
                 'Общее количество просмотров первых 50 объявлений (всего)': 0
             }
 
+            print(f'Парсится ссылка {URL}')
+            print(f'{"Ключ": ^25} | {"Регион": ^26} | {"Категория": ^29} | {"Подкатегория": ^32}')
+            print('_' * 121)
+            print(f'{ad_name: ^23} | {region: ^26} | {category: ^28} | {subcategory: ^32}')
+
             set_common_amount_of_ad()
             set_date_of_publication_of_ad()
             time.sleep(3)
