@@ -1,7 +1,12 @@
 """
 Это парсер данных с авито. Он проходится по каждому объявлению и собирает нужные
 данные. Во время парсинга авито может указывать количество объявлений указанные
-по параметрам с рекламой, так что иногда счётчик может показывать неправильное количество
+по параметрам с рекламой, так что иногда счётчик может показывать неправильное количество.
+Парсер принимает параметры из xlsx файла. Его стандарт должен выглядить примерно так:
+     Ключи     |     Регион    |     Категория     |     Подкатегория
+---------------------------------------------------------------------------------------
+ Дезинфекция  | Москва       | Услуги             | Уборка
+ ...
 """
 from urllib import parse
 from sys import exit
@@ -42,11 +47,6 @@ int_price = NewType('int_price', int)
 # To read the first fifty ads
 counter_first_fifty_ads: int = 50
 max_parsed_ad_on_one_session = 100
-
-ad_name = ''
-region = ''
-category = ''
-subcategory = ''
 list_statistic_about_ad: List[dict] = []
 start_time_script = time.time()
 output_xlsx_file: dict = {}
@@ -67,7 +67,7 @@ names_columns_in_statistic_by_ad = [
 ]
 
 
-def get_response(url: url_type, params: dict = {}):
+def get_response(url: url_type, params: dict = {}) -> Response or False:
     """Tries to get an answer by url from Avito 10 times. If it failed, it returns False"""
     number_of_request_try: int = 10
     for try_ in range(number_of_request_try):
@@ -84,39 +84,43 @@ def get_response(url: url_type, params: dict = {}):
         return False
 
 
-def set_common_amount_of_ad() -> None:
+def process_url_for_validity(ad_name: str, region: str, category: str,
+                             subcategory: str, url: url_type) -> url_type or False:
     """
-    Set common amount of ad and check if there is an exception
-     were they banned by IP or no ads were found for these parameters.
+    Process url for parser. Avito generates a lot of noise when parsing data from its data.
+    Sometimes the parameters by which the parser will search for data are invalid for the link,
+    and this function does everything possible to create the correct link.
 
-    return: bool -> if page have ads True, if not have - False.
+    ad_name: str -> ad name parameter.
+    region: str -> region by which will search ads.
+    category: str -> category by which will search ads.
+    subcategory: str -> subcategory by which will search ads.
+
+    @return: url or False -> If url success handled, return handled url else parameters incorrect, return False and
+    stop parsing ads by this parameters.
     """
-    global ad_name, region, category, subcategory, URL
-
-    past_region = region
-    for try_number in range(1, 5):
+    for try_number in range(1, 4 + 1):
         try:
-            page_with_ads = get_response(URL)
-            bs_html: BeautifulSoup = BeautifulSoup(page_with_ads.content, 'html.parser')
-            amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
-            output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string.replace(' ', ''))
+            test_request = get_response(url)
+            bs_html: BeautifulSoup = BeautifulSoup(test_request.content, 'html.parser')
+            test_get_text = bs_html.find('span', class_='page-title-count-1oJOc').get_text
 
-            print(f'Парсится ссылка {URL}')
-            print(f'{"Ключ": ^25} | {"Регион": ^26} | {"Категория": ^29} | {"Подкатегория": ^32}')
-            print('_' * 121)
-            print(f'{ad_name: ^23} | {region: ^26} | {category: ^28} | {subcategory: ^32}')
-
-            return True
         except AttributeError:
             if bs_html.find('h2', class_='no-results-title-3kn6E') is not None:
+
                 print('Ничего не найдено в выбранной области поиска')
                 return False
+
             elif bs_html.find('h2', class_='firewall-title') is None:
+
                 if try_number == 1:
+
+                    past_region = region
                     region = region.split()[-1].strip()
                     region_for_url = transliterate.translit(
                         region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
-                    URL = URL[:URL[8:].find('/') + 9] + region_for_url + URL[21 + URL[21:].find('/'):]
+                    url = f"{HOST}/{region_for_url}{url[21 + url[21:].find('/'):]}"
+
                 elif try_number == 2:
                     print(f'Введите регион ({region}), что бы он отвечал на вопрос (область чья?) '
                           'или образовывал словосочитание по типу (Московская область).\n'
@@ -127,14 +131,14 @@ def set_common_amount_of_ad() -> None:
                     region_for_url = transliterate.translit(
                         region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
 
-                    URL = URL[:URL[8:].find('/') + 9] + region_for_url + URL[21 + URL[21:].find('/'):]
+                    url = f"{HOST}/{region_for_url}{URL[21 + URL[21:].find('/'):]}"
 
                 elif try_number == 3:
 
                     print('Введите ссылку вручную. Её можно получить на Авито '
                           'https://www.avito.ru/ в адресной строке, указав в поисковик параметры:\n'
                           f'Ключ: {ad_name}; Регион: {past_region}; Категория: {category}; Подкатегория: {subcategory};\n')
-                    URL = input('Вводите: ')
+                    url = input('Вводите: ')
                     region = transliterate.translit(URL[21:URL.find('/', 21)], 'ru')
 
                 else:
@@ -143,6 +147,55 @@ def set_common_amount_of_ad() -> None:
             elif bs_html.find('h2', class_='firewall-title') is not None:
                 print(c('Ваш IP адрес заблокировал Avito на время. Следуйте указаниям файла help.txt.').red)
                 exit()
+
+        else:
+            return url
+
+
+def generate_valid_url_for_parsing(ad_name: str, region: str, category: str, subcategory: str) -> url_type:
+    """Generate url for parsing ads from avito."""
+    global URL
+
+    # Parameters may be with comma. Them need delete.
+    if region.count(',') == 1:
+        region = region.replace(',', '')
+    elif region.count(',') > 1:
+        region = region.split(',')[-1].strip()
+
+    ad_name_for_url = parse.urlencode({'q': ad_name})
+    region_for_url = transliterate.translit(
+        region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+
+    # Avito for this two category make unique name in link
+    if category == 'услуги':
+        category_for_url = 'predlozheniya_uslug'
+    elif category == 'готовый бизнес и оборудование':
+        category_for_url = 'dlya_biznesa'
+    else:
+        category_for_url = transliterate.translit(
+            category, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
+
+    try:
+        if subcategory == 'уборка':
+            subcategory_for_url = 'uborka_klining'
+        else:
+            subcategory_for_url = transliterate.translit(
+                subcategory, reversed=True).strip().replace(' ', '_').replace("'", '').replace('j', 'y')
+    except transliterate.exceptions.LanguageDetectionError:
+        subcategory_for_url = ''
+    handled_url = process_url_for_validity(
+        ad_name, region, category, subcategory,
+        f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}')
+    URL = handled_url
+
+
+def set_common_amount_of_ad() -> None:
+    """Set common amount of ad."""
+
+    page_with_ads = get_response(URL)
+    bs_html: BeautifulSoup = BeautifulSoup(page_with_ads.content, 'html.parser')
+    amount_ad = bs_html.find('span', class_='page-title-count-1oJOc')
+    output_xlsx_file['Общее количество объявлений'] = int(amount_ad.string.replace(' ', ''))
 
 
 def set_total_amount_views(views_on_ad_page: list) -> None:
@@ -537,8 +590,7 @@ def send_workbook_lists() -> None:
 
 
 def run():
-    global ad_name, region, category, subcategory, list_statistic_about_ad, counter_first_fifty_ads, \
-        output_xlsx_file, parsed_ads, URL
+    global list_statistic_about_ad, counter_first_fifty_ads, output_xlsx_file, parsed_ads, URL
 
     row: int = 2
     column_letters = 'ABCD'
@@ -558,9 +610,8 @@ def run():
                 break
 
         if row_is_fill:
-            # Pause before parsing
             print('Подождите 40-65 секунд...')
-            # time.sleep(round(randint(40, 65) + random(), 2))
+            time.sleep(round(randint(40, 65) + random(), 2))
 
             # Parameters for link which need parsed
             ad_name = workbook_list[f'A{row}'].value
@@ -568,23 +619,10 @@ def run():
             category = workbook_list[f'C{row}'].value.lower().strip()
             subcategory = workbook_list[f'D{row}'].value.lower().strip()
 
-            # Formatted to construct a link
-            if region.count(',') == 1:
-                region = region.replace(',', '')
-            elif region.count(',') > 1:
-                region = region.split(',')[-1].strip()
-            ad_name_for_url = parse.urlencode({'q': ad_name})
-            region_for_url = transliterate.translit(
-                region, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
-            category_for_url = transliterate.translit(
-                category, reversed=True).replace(' ', '_').strip().replace("'", '').replace('j', 'y')
-            try:
-                subcategory_for_url = transliterate.translit(
-                    subcategory, reversed=True).strip().replace(' ', '_').replace("'", '').replace('j', 'y')
-            except transliterate.exceptions.LanguageDetectionError:
-                subcategory_for_url = ''
+            generate_valid_url_for_parsing(ad_name, region, category, subcategory)
+            if not URL:
+                continue
 
-            URL = f'{HOST}/{region_for_url}/{category_for_url}/{subcategory_for_url}?{ad_name_for_url}'
             row += 1
 
             # Reset past data
@@ -605,12 +643,11 @@ def run():
                 'Общее количество просмотров первых 50 объявлений (всего)': 0
             }
 
-            if not set_common_amount_of_ad():
-                continue
+            set_common_amount_of_ad()
             set_date_of_publication_of_ad()
             time.sleep(3)
 
-            avito_response: Response = requests.get(URL, headers={'User-Agent': choice(USER_AGENTS)}, timeout=120)
+            avito_response: Response = get_response(URL)
             avito_page_content: BeautifulSoup = BeautifulSoup(avito_response.content, 'html.parser')
             try:
                 max_pages = int(avito_page_content.find_all('span', class_='pagination-item-1WyVp')[-2].text)
